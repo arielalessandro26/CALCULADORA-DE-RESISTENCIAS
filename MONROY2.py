@@ -76,14 +76,12 @@ def find_best_combinations(target, tolerance, max_results=8):
 
   # 2. Dos resistencias
   for r1, r2 in itertools.combinations_with_replacement(resistors, 2):
-    # Serie
     eq = r1 + r2
     error = abs(eq - target) / target * 100
     results.append(
         (error, eq, f"{format_resistor(r1)} + {format_resistor(r2)} (Serie)")
     )
 
-    # Paralelo
     eq = calc_parallel(r1, r2)
     if eq > 0:
       results.append(
@@ -94,9 +92,9 @@ def find_best_combinations(target, tolerance, max_results=8):
           )
       )
 
-  # 3. Tres resistencias (Evaluación estricta de topologías)
+  # 3. Tres resistencias (Evaluación de topologías puras y mixtas)
   for r1, r2, r3 in itertools.combinations_with_replacement(resistors, 3):
-    # 3.1 Serie pura: R1 + R2 + R3
+    # 3.1 Serie pura
     eq = r1 + r2 + r3
     results.append((
         abs(eq - target) / target * 100,
@@ -105,7 +103,7 @@ def find_best_combinations(target, tolerance, max_results=8):
         f" {format_resistor(r3)}) (Serie)",
     ))
 
-    # 3.2 Paralelo puro: R1 || R2 || R3
+    # 3.2 Paralelo puro
     p1 = calc_parallel(r1, r2)
     eq = calc_parallel(p1, r3)
     if eq > 0:
@@ -138,10 +136,8 @@ def find_best_combinations(target, tolerance, max_results=8):
             f" {format_resistor(c)} (Mixta)",
         ))
 
-  # Ordenar por menor error porcentual
   results.sort(key=lambda x: x[0])
 
-  # Filtrar duplicados cercanos
   unique_results = []
   seen = set()
   for item in results:
@@ -155,21 +151,31 @@ def find_best_combinations(target, tolerance, max_results=8):
   return unique_results
 
 
-# Controles en la interfaz web
-col1, col2 = st.columns(2)
+# Controles en la interfaz web distribuidos en columnas
+col1, col2, col3 = st.columns([2, 1.5, 1.5])
 
 with col1:
-  target_val = st.number_input(
-      "Valor Objetivo de Resistencia (Ω):",
-      min_value=0.1,
-      value=45817.0,
-      step=1.0,
+  raw_target = st.number_input(
+      "Valor Objetivo:", min_value=0.1, value=45.817, step=0.001, format="%.3f"
   )
 
 with col2:
-  tolerance_val = st.selectbox(
-      "Tolerancia deseada:", options=[1, 10], format_func=lambda x: f"{x}%"
+  unit = st.selectbox(
+      "Unidad:", options=["Ω (Ohms)", "kΩ (kilo-ohms)", "MΩ (Mega-ohms)"]
   )
+
+with col3:
+  tolerance_val = st.selectbox(
+      "Tolerancia:", options=[1, 10], format_func=lambda x: f"{x}%"
+  )
+
+# Convertir el valor ingresado a Ohms puros según la unidad seleccionada
+if "kΩ" in unit:
+  target_val = raw_target * 1e3
+elif "MΩ" in unit:
+  target_val = raw_target * 1e6
+else:
+  target_val = raw_target
 
 if st.button("Calcular Combinaciones", type="primary"):
   best_results = find_best_combinations(target_val, tolerance_val)
